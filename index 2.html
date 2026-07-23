@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Fitness Log</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+    max-width: 700px; margin: 0 auto; padding: 16px; padding-bottom: 90px;
+    background: #0a0a0a; color: #f2f2f2;
+  }
+  h2 { font-weight: 800; font-size: 28px; margin-bottom: 16px; letter-spacing: -0.5px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; background: #161616; padding: 6px; border-radius: 16px; }
+  .tab-btn { flex: 1; padding: 10px; background: none; border: none; font-size: 15px; font-weight: 700;
+             color: #888; cursor: pointer; border-radius: 12px; transition: 0.15s; }
+  .tab-btn.active { background: #2a2a2a; color: #fff; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Stats top */
+  .stats-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .stat-box { flex: 1; min-width: 90px; background: #161616; border-radius: 18px; padding: 12px 8px; text-align: center; }
+  .stat-box .label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-box .value { font-size: 18px; font-weight: 800; margin-top: 4px; color: #f2f2f2; }
+  .stat-ok { color: #3ddc84 !important; }
+  .stat-bad { color: #ff5c5c !important; }
+
+  /* Graph */
+  .graph-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .graph-header strong { font-size: 16px; font-weight: 800; }
+  canvas { border-radius: 18px; background: #161616; width: 100%; margin-top: 4px; }
+
+  /* Nutrition checkboxes on Start page */
+  .nutri-check-row { display: flex; gap: 14px; margin: 16px 0; padding: 14px; background: #161616; border-radius: 18px; flex-wrap: wrap; }
+  .nutri-check-row label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #ddd; }
+  .nutri-check-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: #3ddc84; }
+
+  /* Selector buttons above table */
+  .select-btn-row { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-start; }
+  .select-btn { padding: 8px 16px; border: none; background: #161616; color: #aaa; border-radius: 12px; cursor: pointer; font-size: 13px; font-weight: 700; }
+  .select-btn.active { background: #f2f2f2; color: #0a0a0a; }
+
+  /* Table -> card list feel */
+  table { border-collapse: collapse; width: 100%; margin-top: 14px; background: #161616; border-radius: 18px; overflow: hidden; }
+  td, th { border: none; border-bottom: 1px solid #232323; padding: 10px 14px; font-size: 14px; text-align: left; color: #ddd; }
+  th { color: #888; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; background: #1c1c1c; }
+  tr:last-child td { border-bottom: none; }
+
+  /* Floating plus button */
+  .fab { position: fixed; bottom: 24px; right: 24px; width: 58px; height: 58px; border-radius: 50%;
+         background: #f2f2f2; color: #0a0a0a; font-size: 30px; font-weight: 700; border: none; cursor: pointer;
+         box-shadow: 0 4px 14px rgba(0,0,0,0.5); }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: #161616; color: #f2f2f2; padding: 24px; border-radius: 22px; width: 90%; max-width: 400px; max-height: 85vh; overflow-y: auto; }
+  .modal h3 { font-weight: 800; margin-top: 0; }
+  .modal label { display: block; margin-top: 12px; font-size: 13px; font-weight: 600; color: #aaa; }
+  .modal input, .modal select {
+    width: 100%; padding: 10px; margin-top: 4px; background: #232323; border: 1px solid #333;
+    border-radius: 10px; color: #f2f2f2; font-size: 14px;
+  }
+  .modal-actions { margin-top: 18px; display: flex; gap: 10px; }
+  .modal-actions button { flex: 1; padding: 10px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
+  .modal-actions button:first-child { background: #232323; color: #ccc; }
+  .modal-actions button:last-child { background: #3ddc84; color: #0a0a0a; }
+  .exercise-row { display: flex; gap: 6px; margin-top: 8px; }
+  .exercise-row input { width: auto; flex: 1; }
+  .exercise-row button { background: #232323; color: #ccc; border: none; border-radius: 8px; padding: 0 10px; cursor: pointer; }
+  .check-row { display: flex; gap: 15px; margin-top: 10px; }
+  .check-row label { display: flex; align-items: center; gap: 5px; margin-top: 0; }
+</style>
+</head>
+<body>
+
+<h2>Fitness Log</h2>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('start')">Start</button>
+  <button class="tab-btn" onclick="switchTab('training')">Training</button>
+</div>
+
+<!-- START TAB -->
+<div id="tab-start" class="tab-content active">
+  <label style="font-size:13px; font-weight:600; color:#aaa;">Datum
+    <input type="date" id="startDate" onchange="onStartDateChange()" style="display:block; width:100%; padding:10px; margin-top:4px; background:#161616; border:none; border-radius:12px; color:#f2f2f2; font-size:14px;">
+  </label>
+
+  <div class="stats-row" id="statsRow" style="margin-top:14px;"></div>
+
+  <div class="graph-header">
+    <strong>Verlauf</strong>
+  </div>
+  <canvas id="mainChart" width="650" height="220"></canvas>
+
+  <div class="nutri-check-row">
+    <label><input type="checkbox" id="s_kcal_ok" onchange="toggleNutri('kcal_ok', this.checked)"> Kalorien erreicht</label>
+    <label><input type="checkbox" id="s_carbs_ok" onchange="toggleNutri('carbs_ok', this.checked)"> Carbs erreicht</label>
+    <label><input type="checkbox" id="s_protein_ok" onchange="toggleNutri('protein_ok', this.checked)"> Protein erreicht</label>
+  </div>
+
+  <div class="select-btn-row">
+    <button class="select-btn active" data-mode="gewicht" onclick="selectMode('gewicht')">Weight</button>
+    <button class="select-btn" data-mode="oberarm" onclick="selectMode('oberarm')">Arms</button>
+    <button class="select-btn" data-mode="brust" onclick="selectMode('brust')">Chest</button>
+  </div>
+
+  <table id="startTable">
+    <thead><tr id="startTableHead"></tr></thead>
+    <tbody id="startTableBody"></tbody>
+  </table>
+</div>
+
+<!-- TRAINING TAB -->
+<div id="tab-training" class="tab-content">
+  <div class="select-btn-row">
+    <button class="select-btn active" data-cat="push" onclick="selectTrainingCat('push')">Push</button>
+    <button class="select-btn" data-cat="pull" onclick="selectTrainingCat('pull')">Pull</button>
+    <button class="select-btn" data-cat="legs" onclick="selectTrainingCat('legs')">Legs</button>
+  </div>
+  <table>
+    <thead><tr><th>Datum</th><th>Übung</th><th>Sätze</th><th>Wdh</th><th>Gewicht</th></tr></thead>
+    <tbody id="trainingTableBody"></tbody>
+  </table>
+</div>
+
+<button class="fab" onclick="openModal()">+</button>
+
+<!-- MODAL: Start tab entry (context-sensitive) -->
+<div class="modal-overlay" id="startModal">
+  <div class="modal">
+    <h3 id="startModalTitle">Eintragen</h3>
+    <label>Datum <input type="date" id="m_datum"></label>
+
+    <label id="m_field_label">Gewicht (kg)</label>
+    <input type="number" step="0.1" id="m_value">
+
+    <div class="modal-actions">
+      <button onclick="closeModal('startModal')">Abbrechen</button>
+      <button onclick="saveStartEntry()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Training tab entry -->
+<div class="modal-overlay" id="trainingModal">
+  <div class="modal">
+    <h3>Training eintragen</h3>
+    <label>Datum <input type="date" id="t_datum"></label>
+    <div id="t_exercise_list"></div>
+    <button onclick="addExerciseRow()">+ Übung</button>
+    <div class="modal-actions">
+      <button onclick="closeModal('trainingModal')">Abbrechen</button>
+      <button onclick="saveTrainingEntry()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAILY_KEY = "fl_daily";       // gewicht, maße, ernährung, kreatin
+const TRAINING_KEY = "fl_training"; // { datum, exercises: [{name, sets, reps, weight}] }
+const EX_KNOWN_KEY = "fl_known_exercises";
+
+function loadJSON(key) { return JSON.parse(localStorage.getItem(key) || "[]"); }
+function saveJSON(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+function todayStr() {
+  const d = new Date();
+  return d.toISOString().split("T")[0];
+}
+
+let currentTab = "start";
+let currentStartDate = todayStr();
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+  document.getElementById("tab-" + tab).classList.add("active");
+  event.target.classList.add("active");
+  if (tab === "training") renderTrainingTable();
+}
+
+function onStartDateChange() {
+  currentStartDate = document.getElementById("startDate").value || todayStr();
+  renderStats();
+}
+
+// ---------- MODE (Weight/Arms/Chest) ----------
+let currentMode = "gewicht";
+const MODE_LABELS = { gewicht: "Gewicht (kg)", oberarm: "Oberarmumfang (cm)", brust: "Brustumfang (cm)" };
+const MODE_FIELD = { gewicht: "gewicht", oberarm: "oberarm", brust: "brust" };
+
+function selectMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll("#tab-start .select-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+  renderStartTable();
+  renderChart();
+}
+
+// ---------- TRAINING CATEGORY (Push/Pull/Legs) ----------
+let currentTrainingCat = "push";
+function selectTrainingCat(cat) {
+  currentTrainingCat = cat;
+  document.querySelectorAll("#tab-training .select-btn").forEach(b => b.classList.toggle("active", b.dataset.cat === cat));
+  renderTrainingTable();
+}
+
+function toggleNutri(key, checked) {
+  const datum = currentStartDate;
+  let entries = loadJSON(DAILY_KEY);
+  const idx = entries.findIndex(e => e.datum === datum);
+  if (idx >= 0) {
+    entries[idx][key] = checked;
+  } else {
+    entries.push({ datum, [key]: checked });
+    entries.sort((a, b) => a.datum.localeCompare(b.datum));
+  }
+  saveJSON(DAILY_KEY, entries);
+  renderStats();
+  renderChart();
+}
+
+// ---------- MODAL HANDLING ----------
+function openModal() {
+  if (currentTab === "start") {
+    document.getElementById("m_datum").value = currentStartDate;
+    document.getElementById("m_field_label").textContent = MODE_LABELS[currentMode];
+    document.getElementById("m_value").value = "";
+    document.getElementById("startModal").classList.add("active");
+  } else {
+    document.getElementById("t_datum").value = todayStr();
+    document.getElementById("t_exercise_list").innerHTML = "";
+    addExerciseRow();
+    document.getElementById("trainingModal").classList.add("active");
+  }
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove("active");
+}
+
+// ---------- START TAB: SAVE ----------
+function saveStartEntry() {
+  const datum = document.getElementById("m_datum").value;
+  if (!datum) { alert("Bitte Datum wählen."); return; }
+
+  const fieldName = MODE_FIELD[currentMode];
+  const entry = {
+    datum,
+    [fieldName]: document.getElementById("m_value").value || null
+  };
+
+  let entries = loadJSON(DAILY_KEY);
+  const idx = entries.findIndex(e => e.datum === datum);
+  if (idx >= 0) entries[idx] = { ...entries[idx], ...entry };
+  else entries.push(entry);
+  entries.sort((a, b) => a.datum.localeCompare(b.datum));
+  saveJSON(DAILY_KEY, entries);
+
+  closeModal("startModal");
+  renderAll();
+}
+
+// ---------- TRAINING TAB: SAVE ----------
+function addExerciseRow(values) {
+  const container = document.getElementById("t_exercise_list");
+  const known = loadJSON(EX_KNOWN_KEY);
+  const dlId = "ex-options";
+  if (!document.getElementById(dlId)) {
+    const dl = document.createElement("datalist");
+    dl.id = dlId;
+    known.forEach(n => {
+      const o = document.createElement("option");
+      o.value = n;
+      dl.appendChild(o);
+    });
+    document.body.appendChild(dl);
+  }
+  const row = document.createElement("div");
+  row.className = "exercise-row";
+  row.innerHTML = `
+    <input type="text" placeholder="Übung" class="ex-name" list="${dlId}" value="${values?.name || ''}">
+    <input type="number" placeholder="Sätze" class="ex-sets" value="${values?.sets || ''}" style="max-width:60px">
+    <input type="number" placeholder="Wdh" class="ex-reps" value="${values?.reps || ''}" style="max-width:60px">
+    <input type="number" placeholder="Gewicht" class="ex-weight" value="${values?.weight || ''}" style="max-width:70px">
+    <button onclick="this.parentElement.remove()">x</button>
+  `;
+  container.appendChild(row);
+}
+
+function saveTrainingEntry() {
+  const datum = document.getElementById("t_datum").value;
+  if (!datum) { alert("Bitte Datum wählen."); return; }
+
+  const rows = document.querySelectorAll("#t_exercise_list .exercise-row");
+  const exercises = [];
+  const known = loadJSON(EX_KNOWN_KEY);
+  rows.forEach(row => {
+    const name = row.querySelector(".ex-name").value.trim();
+    if (!name) return;
+    exercises.push({
+      name,
+      sets: row.querySelector(".ex-sets").value,
+      reps: row.querySelector(".ex-reps").value,
+      weight: row.querySelector(".ex-weight").value
+    });
+    if (!known.includes(name)) known.push(name);
+  });
+  saveJSON(EX_KNOWN_KEY, known);
+
+  let entries = loadJSON(TRAINING_KEY);
+  const idx = entries.findIndex(e => e.datum === datum && e.category === currentTrainingCat);
+  if (idx >= 0) {
+    entries[idx].exercises = entries[idx].exercises.concat(exercises);
+  } else {
+    entries.push({ datum, category: currentTrainingCat, exercises });
+  }
+  entries.sort((a, b) => a.datum.localeCompare(b.datum));
+  saveJSON(TRAINING_KEY, entries);
+
+  closeModal("trainingModal");
+  renderTrainingTable();
+}
+
+// ---------- RENDER: STATS ----------
+function renderStats() {
+  const entries = loadJSON(DAILY_KEY);
+  const last = entries[entries.length - 1] || {};
+
+  const todayEntry = entries.find(e => e.datum === currentStartDate) || {};
+  document.getElementById("s_kcal_ok").checked = !!todayEntry.kcal_ok;
+  document.getElementById("s_carbs_ok").checked = !!todayEntry.carbs_ok;
+  document.getElementById("s_protein_ok").checked = !!todayEntry.protein_ok;
+  const box = (label, value, ok) => `
+    <div class="stat-box">
+      <div class="label">${label}</div>
+      <div class="value ${ok === true ? 'stat-ok' : ok === false ? 'stat-bad' : ''}">${value}</div>
+    </div>`;
+  document.getElementById("statsRow").innerHTML =
+    box("Gewicht", last.gewicht ? last.gewicht + " kg" : "-") +
+    box("Oberarm", last.oberarm ? last.oberarm + " cm" : "-") +
+    box("Brust", last.brust ? last.brust + " cm" : "-") +
+    box("Kcal", last.kcal_ok === undefined ? "-" : (last.kcal_ok ? "✓" : "✗"), last.kcal_ok) +
+    box("Carbs", last.carbs_ok === undefined ? "-" : (last.carbs_ok ? "✓" : "✗"), last.carbs_ok) +
+    box("Protein", last.protein_ok === undefined ? "-" : (last.protein_ok ? "✓" : "✗"), last.protein_ok);
+}
+
+// ---------- RENDER: TABLE (Start tab, filtered by graph selection) ----------
+function renderStartTable() {
+  const mode = currentMode;
+  const head = document.getElementById("startTableHead");
+  const body = document.getElementById("startTableBody");
+
+  if (mode === "gewicht") {
+    head.innerHTML = "<th>Datum</th><th>Gewicht</th>";
+    const entries = loadJSON(DAILY_KEY).filter(e => e.gewicht).sort((a, b) => b.datum.localeCompare(a.datum));
+    body.innerHTML = entries.map(e => `<tr><td>${e.datum}</td><td>${e.gewicht} kg</td></tr>`).join("");
+  } else if (mode === "oberarm") {
+    head.innerHTML = "<th>Datum</th><th>Oberarm</th>";
+    const entries = loadJSON(DAILY_KEY).filter(e => e.oberarm).sort((a, b) => b.datum.localeCompare(a.datum));
+    body.innerHTML = entries.map(e => `<tr><td>${e.datum}</td><td>${e.oberarm} cm</td></tr>`).join("");
+  } else if (mode === "brust") {
+    head.innerHTML = "<th>Datum</th><th>Brust</th>";
+    const entries = loadJSON(DAILY_KEY).filter(e => e.brust).sort((a, b) => b.datum.localeCompare(a.datum));
+    body.innerHTML = entries.map(e => `<tr><td>${e.datum}</td><td>${e.brust} cm</td></tr>`).join("");
+  }
+}
+
+// ---------- RENDER: TRAINING TABLE ----------
+function renderTrainingTable() {
+  const body = document.getElementById("trainingTableBody");
+  const rows = [];
+  const catEntries = loadJSON(TRAINING_KEY)
+    .filter(e => e.category === currentTrainingCat)
+    .sort((a, b) => b.datum.localeCompare(a.datum));
+
+  const last = catEntries[0]; // nur der zuletzt eingetragene Tag dieser Kategorie
+  if (last) {
+    last.exercises.forEach(ex => {
+      rows.push(`<tr><td>${last.datum}</td><td>${ex.name}</td><td>${ex.sets}</td><td>${ex.reps}</td><td>${ex.weight} kg</td></tr>`);
+    });
+  }
+  body.innerHTML = rows.join("");
+}
+
+// ---------- CHART ----------
+function renderChart() {
+  const canvas = document.getElementById("mainChart");
+  const ctx = canvas.getContext("2d");
+  canvas.width = canvas.clientWidth;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const mode = currentMode;
+  const daily = loadJSON(DAILY_KEY);
+
+  let points = [];
+  if (mode === "gewicht") points = daily.filter(e => e.gewicht).map(e => ({ datum: e.datum, val: parseFloat(e.gewicht) }));
+  else if (mode === "oberarm") points = daily.filter(e => e.oberarm).map(e => ({ datum: e.datum, val: parseFloat(e.oberarm) }));
+  else if (mode === "brust") points = daily.filter(e => e.brust).map(e => ({ datum: e.datum, val: parseFloat(e.brust) }));
+
+  const stripeHeight = 30;
+  const padding = 30;
+  const chartH = canvas.height - padding - stripeHeight - 20;
+  const w = canvas.width - padding * 2;
+
+  // Build a date -> x mapping based on actual elapsed time, not index position
+  const allDates = daily.map(e => e.datum);
+  let xForDate = () => padding;
+  if (allDates.length > 0) {
+    const times = allDates.map(d => new Date(d).getTime());
+    const minT = Math.min(...times);
+    const maxT = Math.max(...times);
+    const span = maxT - minT || 1;
+    xForDate = (datum) => padding + ((new Date(datum).getTime() - minT) / span) * w;
+  }
+
+  if (points.length < 2) {
+    ctx.fillStyle = "#888";
+    ctx.fillText("Mindestens 2 Einträge nötig für Diagramm.", 10, 100);
+  } else {
+    const vals = points.map(p => p.val);
+    const min = Math.min(...vals) - 1;
+    const max = Math.max(...vals) + 1;
+
+    ctx.beginPath();
+    ctx.strokeStyle = "#333333";
+    ctx.moveTo(padding, 10);
+    ctx.lineTo(padding, chartH);
+    ctx.lineTo(canvas.width - padding, chartH);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.strokeStyle = "#3ddc84";
+    ctx.lineWidth = 2;
+    points.forEach((p, i) => {
+      const x = xForDate(p.datum);
+      const y = chartH - ((p.val - min) / (max - min)) * (chartH - 20);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.lineWidth = 1;
+
+    ctx.fillStyle = "#888888";
+    ctx.fillText(max.toFixed(1), 2, 15);
+    ctx.fillText(min.toFixed(1), 2, chartH);
+  }
+
+  // Nutrition stripes: aligned to the same real-date x-axis as the graph above,
+  // so an unchecked day only creates a gap at that day, not the whole stripe.
+  const nutriEntries = [...daily].sort((a, b) => a.datum.localeCompare(b.datum));
+  if (nutriEntries.length > 0) {
+    const rows = [
+      { key: "kcal_ok", color: "#2ecc71", y: chartH + 10 },
+      { key: "carbs_ok", color: "#e91e8c", y: chartH + 18 },
+      { key: "protein_ok", color: "#3498db", y: chartH + 26 }
+    ];
+    const slot = nutriEntries.length > 1 ? w / nutriEntries.length : w * 0.05;
+    rows.forEach(r => {
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = 3;
+      nutriEntries.forEach((e) => {
+        if (e[r.key]) {
+          const x1 = xForDate(e.datum) - slot / 2;
+          const x2 = xForDate(e.datum) + slot / 2;
+          ctx.beginPath();
+          ctx.moveTo(Math.max(x1, padding), r.y);
+          ctx.lineTo(Math.min(x2, canvas.width - padding), r.y);
+          ctx.stroke();
+        }
+      });
+    });
+    ctx.lineWidth = 1;
+  }
+}
+
+function renderAll() {
+  renderStats();
+  renderStartTable();
+  renderChart();
+}
+
+document.getElementById("startDate").value = todayStr();
+renderAll();
+</script>
+
+</body>
+</html>
