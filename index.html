@@ -8,7 +8,7 @@
   * { box-sizing: border-box; }
   body {
     font-family: -apple-system, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
-    max-width: 700px; margin: 0 auto; padding: 16px; padding-bottom: 90px;
+    max-width: 700px; margin: 0 auto; padding: 20px 18px; padding-bottom: 90px;
     background: #0a0a0a; color: #f2f2f2; font-size: 16px;
   }
   h2 { font-weight: 800; font-size: 28px; margin-bottom: 16px; letter-spacing: -0.5px; }
@@ -50,6 +50,16 @@
   th { color: #888; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; background: #1c1c1c; }
   tr:last-child td { border-bottom: none; }
 
+  /* Training list as cards (avoids horizontal scrolling on narrow screens) */
+  .ex-card-list { margin-top: 14px; background: #161616; border-radius: 18px; overflow: hidden; }
+  .ex-card { padding: 12px 14px; border-bottom: 1px solid #232323; }
+  .ex-card:last-child { border-bottom: none; }
+  .ex-card .ex-card-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .ex-card .ex-card-name { font-weight: 700; font-size: 15px; color: #f2f2f2; }
+  .ex-card .ex-card-date { font-size: 12px; color: #888; }
+  .ex-card .ex-card-stats { display: flex; gap: 16px; margin-top: 6px; font-size: 13px; color: #ccc; }
+  .ex-card .ex-card-stats b { color: #f2f2f2; }
+
   /* Floating plus button */
   .fab { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); right: calc(24px + env(safe-area-inset-right));
          width: 58px; height: 58px; border-radius: 50%; z-index: 500;
@@ -70,8 +80,12 @@
   .modal-actions button { flex: 1; padding: 10px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
   .modal-actions button:first-child { background: #232323; color: #ccc; }
   .modal-actions button:last-child { background: #3ddc84; color: #0a0a0a; }
-  .exercise-row { display: flex; gap: 6px; margin-top: 8px; }
-  .exercise-row input { width: auto; flex: 1; }
+  .exercise-row { margin-top: 12px; padding-top: 10px; border-top: 1px solid #232323; }
+  .exercise-row:first-child { border-top: none; padding-top: 0; }
+  .exercise-row .ex-top { display: flex; gap: 6px; }
+  .exercise-row .ex-top .ex-name { flex: 1; }
+  .exercise-row .ex-bottom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 6px; }
+  .exercise-row input { width: auto; }
   .exercise-row button { background: #232323; color: #ccc; border: none; border-radius: 8px; padding: 0 10px; cursor: pointer; }
   .check-row { display: flex; gap: 15px; margin-top: 10px; }
   .check-row label { display: flex; align-items: center; gap: 5px; margin-top: 0; }
@@ -124,10 +138,7 @@
     <button class="select-btn" data-cat="pull" onclick="selectTrainingCat('pull')">Pull</button>
     <button class="select-btn" data-cat="legs" onclick="selectTrainingCat('legs')">Legs</button>
   </div>
-  <table>
-    <thead><tr><th>Datum</th><th>Übung</th><th>Sätze</th><th>Wdh</th><th>Gewicht</th></tr></thead>
-    <tbody id="trainingTableBody"></tbody>
-  </table>
+  <div class="ex-card-list" id="trainingTableBody"></div>
 </div>
 
 <button class="fab" onclick="openModal()">+</button>
@@ -285,11 +296,15 @@ function addExerciseRow(values) {
   const row = document.createElement("div");
   row.className = "exercise-row";
   row.innerHTML = `
-    <input type="text" placeholder="Übung" class="ex-name" list="${dlId}" value="${values?.name || ''}">
-    <input type="number" placeholder="Sätze" class="ex-sets" value="${values?.sets || ''}" style="max-width:60px">
-    <input type="number" placeholder="Wdh" class="ex-reps" value="${values?.reps || ''}" style="max-width:60px">
-    <input type="number" placeholder="Gewicht" class="ex-weight" value="${values?.weight || ''}" style="max-width:70px">
-    <button onclick="this.parentElement.remove()">x</button>
+    <div class="ex-top">
+      <input type="text" placeholder="Übung" class="ex-name" list="${dlId}" value="${values?.name || ''}">
+      <button onclick="this.closest('.exercise-row').remove()">x</button>
+    </div>
+    <div class="ex-bottom">
+      <input type="number" placeholder="Sätze" class="ex-sets" value="${values?.sets || ''}">
+      <input type="number" placeholder="Wdh" class="ex-reps" value="${values?.reps || ''}">
+      <input type="number" placeholder="Gewicht" class="ex-weight" value="${values?.weight || ''}">
+    </div>
   `;
   container.appendChild(row);
 }
@@ -383,7 +398,18 @@ function renderTrainingTable() {
   const last = catEntries[0]; // nur der zuletzt eingetragene Tag dieser Kategorie
   if (last) {
     last.exercises.forEach(ex => {
-      rows.push(`<tr><td>${last.datum}</td><td>${ex.name}</td><td>${ex.sets}</td><td>${ex.reps}</td><td>${ex.weight} kg</td></tr>`);
+      rows.push(`
+        <div class="ex-card">
+          <div class="ex-card-top">
+            <span class="ex-card-name">${ex.name}</span>
+            <span class="ex-card-date">${last.datum}</span>
+          </div>
+          <div class="ex-card-stats">
+            <span>Sätze <b>${ex.sets}</b></span>
+            <span>Wdh <b>${ex.reps}</b></span>
+            <span>Gewicht <b>${ex.weight} kg</b></span>
+          </div>
+        </div>`);
     });
   }
   body.innerHTML = rows.join("");
@@ -393,8 +419,14 @@ function renderTrainingTable() {
 function renderChart() {
   const canvas = document.getElementById("mainChart");
   const ctx = canvas.getContext("2d");
-  canvas.width = canvas.clientWidth;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = canvas.clientWidth;
+  const cssHeight = parseInt(canvas.getAttribute("height"), 10) || 220;
+  canvas.width = cssWidth * dpr;
+  canvas.height = cssHeight * dpr;
+  canvas.style.height = cssHeight + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
 
   const mode = currentMode;
   const daily = loadJSON(DAILY_KEY);
@@ -406,8 +438,8 @@ function renderChart() {
 
   const stripeHeight = 30;
   const padding = 30;
-  const chartH = canvas.height - padding - stripeHeight - 20;
-  const w = canvas.width - padding * 2;
+  const chartH = cssHeight - padding - stripeHeight - 20;
+  const w = cssWidth - padding * 2;
 
   // Build a date -> x mapping based on actual elapsed time, not index position
   const allDates = daily.map(e => e.datum);
@@ -432,7 +464,7 @@ function renderChart() {
     ctx.strokeStyle = "#333333";
     ctx.moveTo(padding, 10);
     ctx.lineTo(padding, chartH);
-    ctx.lineTo(canvas.width - padding, chartH);
+    ctx.lineTo(cssWidth - padding, chartH);
     ctx.stroke();
 
     ctx.beginPath();
@@ -470,7 +502,7 @@ function renderChart() {
           const x2 = xForDate(e.datum) + slot / 2;
           ctx.beginPath();
           ctx.moveTo(Math.max(x1, padding), r.y);
-          ctx.lineTo(Math.min(x2, canvas.width - padding), r.y);
+          ctx.lineTo(Math.min(x2, cssWidth - padding), r.y);
           ctx.stroke();
         }
       });
