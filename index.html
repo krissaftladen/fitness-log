@@ -60,10 +60,13 @@
   .ex-cell.empty { color: #555; }
   .ex-edit-input { width: 64px; padding: 6px 8px; background: #232323; border: 1px solid #3ddc84;
                    border-radius: 8px; color: #f2f2f2; font-size: 14px; }
+  .ex-edit-input::placeholder { color: #666; opacity: 1; }
   .ex-edit-hint { font-size: 10px; color: #3ddc84; display: block; margin-top: 2px; white-space: nowrap; }
   .ex-del-btn { background: none; border: none; color: #555; font-size: 16px; cursor: pointer; padding: 4px 6px; }
   .ex-del-btn:active { color: #ff5c5c; }
   .ex-empty-hint { padding: 20px 14px; color: #666; font-size: 14px; text-align: center; }
+  .ex-drag-handle { cursor: grab; color: #555; font-size: 18px; padding: 4px 8px; touch-action: none; user-select: none; }
+  .ex-table tr.dragging { opacity: 0.4; }
 
   /* Floating plus button */
   .fab { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); right: calc(24px + env(safe-area-inset-right));
@@ -130,7 +133,7 @@
   </div>
   <div class="ex-table-wrap">
     <table class="ex-table">
-      <thead><tr><th>Übung</th><th>Sätze</th><th>Wdh</th><th>Gewicht</th><th></th></tr></thead>
+      <thead><tr><th></th><th>Übung</th><th>Sätze</th><th>Wdh</th><th>Gewicht</th><th></th></tr></thead>
       <tbody id="trainingTableBody"></tbody>
     </table>
   </div>
@@ -326,11 +329,14 @@ function beginEdit(id, stage) {
   if (!ex) return;
 
   if (stage === "sets" || !ex.sets) {
-    editState = { id, stage: "sets", index: 0, sets: null, tempReps: [], tempWeight: [] };
+    editState = { id, stage: "sets", index: 0, sets: null, tempReps: [], tempWeight: [],
+                  prevSets: ex.sets || null, prevReps: ex.reps || [], prevWeight: ex.weight || [] };
   } else if (stage === "reps") {
-    editState = { id, stage: "reps", index: 0, sets: ex.sets, tempReps: [], tempWeight: [] };
+    editState = { id, stage: "reps", index: 0, sets: ex.sets, tempReps: [], tempWeight: [],
+                  prevSets: ex.sets, prevReps: ex.reps || [], prevWeight: ex.weight || [] };
   } else if (stage === "weight") {
-    editState = { id, stage: "weight", index: 0, sets: ex.sets, tempReps: ex.reps.slice(), tempWeight: [] };
+    editState = { id, stage: "weight", index: 0, sets: ex.sets, tempReps: ex.reps.slice(), tempWeight: [],
+                  prevSets: ex.sets, prevReps: ex.reps || [], prevWeight: ex.weight || [] };
   }
   renderTrainingTable();
 }
@@ -348,7 +354,8 @@ function commitEditStep(rawVal) {
   if (idx < 0) { editState = null; renderTrainingTable(); return; }
 
   if (editState.stage === "sets") {
-    const n = parseInt(rawVal, 10);
+    let n = parseInt(rawVal, 10);
+    if (!n && editState.prevSets) n = editState.prevSets;
     if (!n || n < 1) { editState = null; renderTrainingTable(); return; }
     editState.sets = n;
     editState.stage = "reps";
@@ -358,7 +365,9 @@ function commitEditStep(rawVal) {
   }
 
   if (editState.stage === "reps") {
-    editState.tempReps[editState.index] = rawVal;
+    let val = rawVal;
+    if (val === "" && editState.prevReps[editState.index] !== undefined) val = editState.prevReps[editState.index];
+    editState.tempReps[editState.index] = val;
     editState.index++;
     if (editState.index < editState.sets) { renderTrainingTable(); return; }
     editState.stage = "weight";
@@ -368,7 +377,9 @@ function commitEditStep(rawVal) {
   }
 
   if (editState.stage === "weight") {
-    editState.tempWeight[editState.index] = rawVal;
+    let val = rawVal;
+    if (val === "" && editState.prevWeight[editState.index] !== undefined) val = editState.prevWeight[editState.index];
+    editState.tempWeight[editState.index] = val;
     editState.index++;
     if (editState.index < editState.sets) { renderTrainingTable(); return; }
     // fertig -> speichern
@@ -381,6 +392,45 @@ function commitEditStep(rawVal) {
     renderTrainingTable();
     return;
   }
+}
+
+// ---------- TRAINING TAB: Reihenfolge per Drag & Drop ----------
+let dragId = null;
+
+function onDragHandleDown(e, id) {
+  e.preventDefault();
+  dragId = id;
+  document.addEventListener("pointermove", onDragMove);
+  document.addEventListener("pointerup", onDragUp);
+  renderTrainingTable();
+}
+
+function onDragMove(e) {
+  if (!dragId) return;
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const row = el && el.closest("tr[data-id]");
+  if (!row) return;
+  const targetId = row.dataset.id;
+  if (targetId === dragId) return;
+
+  const list = loadJSON(EX_LIST_KEY);
+  const catList = list.filter(x => x.category === currentTrainingCat);
+  const others = list.filter(x => x.category !== currentTrainingCat);
+  const fromIdx = catList.findIndex(x => x.id === dragId);
+  const toIdx = catList.findIndex(x => x.id === targetId);
+  if (fromIdx < 0 || toIdx < 0) return;
+
+  const [moved] = catList.splice(fromIdx, 1);
+  catList.splice(toIdx, 0, moved);
+  saveJSON(EX_LIST_KEY, others.concat(catList));
+  renderTrainingTable();
+}
+
+function onDragUp() {
+  dragId = null;
+  document.removeEventListener("pointermove", onDragMove);
+  document.removeEventListener("pointerup", onDragUp);
+  renderTrainingTable();
 }
 
 // ---------- RENDER: STATS ----------
@@ -426,7 +476,7 @@ function renderTrainingTable() {
   const list = loadJSON(EX_LIST_KEY).filter(e => e.category === currentTrainingCat);
 
   if (!list.length) {
-    body.innerHTML = `<tr><td colspan="5" class="ex-empty-hint">Noch keine Übungen. Mit + eine hinzufügen.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="ex-empty-hint">Noch keine Übungen. Mit + eine hinzufügen.</td></tr>`;
     return;
   }
 
@@ -438,7 +488,7 @@ function renderTrainingTable() {
     // ---- Sätze-Zelle ----
     let setsCell;
     if (isEditingRow && editing.stage === "sets") {
-      setsCell = `<input class="ex-edit-input" id="editInput" type="number" inputmode="numeric" placeholder="Sätze"
+      setsCell = `<input class="ex-edit-input" id="editInput" type="number" inputmode="numeric" placeholder="${editing.prevSets || 'Sätze'}"
                     onkeydown="handleEditKey(event)">`;
     } else {
       setsCell = ex.sets
@@ -450,7 +500,7 @@ function renderTrainingTable() {
     let repsCell;
     if (isEditingRow && editing.stage === "reps") {
       repsCell = `<input class="ex-edit-input" id="editInput" type="number" inputmode="numeric"
-                    placeholder="Satz ${editing.index + 1}/${editing.sets}" onkeydown="handleEditKey(event)">
+                    placeholder="${editing.prevReps[editing.index] !== undefined ? editing.prevReps[editing.index] : 'Satz ' + (editing.index + 1)}" onkeydown="handleEditKey(event)">
                   <span class="ex-edit-hint">Satz ${editing.index + 1} von ${editing.sets}</span>`;
     } else if (ex.reps && ex.reps.length) {
       repsCell = `<span class="ex-cell" onclick="beginEdit('${ex.id}','reps')">${ex.reps.join(" | ")}</span>`;
@@ -462,7 +512,7 @@ function renderTrainingTable() {
     let weightCell;
     if (isEditingRow && editing.stage === "weight") {
       weightCell = `<input class="ex-edit-input" id="editInput" type="number" step="0.5" inputmode="decimal"
-                     placeholder="Satz ${editing.index + 1}/${editing.sets}" onkeydown="handleEditKey(event)">
+                     placeholder="${editing.prevWeight[editing.index] !== undefined ? editing.prevWeight[editing.index] : 'Satz ' + (editing.index + 1)}" onkeydown="handleEditKey(event)">
                     <span class="ex-edit-hint">Satz ${editing.index + 1} von ${editing.sets}</span>`;
     } else if (ex.weight && ex.weight.length) {
       weightCell = `<span class="ex-cell" onclick="beginEdit('${ex.id}','weight')">${formatWeightList(ex.weight)}</span>`;
@@ -470,7 +520,10 @@ function renderTrainingTable() {
       weightCell = `<span class="ex-cell empty" onclick="beginEdit('${ex.id}','weight')">-</span>`;
     }
 
-    return `<tr>
+    const isDragging = dragId === ex.id;
+
+    return `<tr data-id="${ex.id}" class="${isDragging ? 'dragging' : ''}">
+      <td><span class="ex-drag-handle" onpointerdown="onDragHandleDown(event,'${ex.id}')">⠿</span></td>
       <td class="ex-name-cell">${ex.name}</td>
       <td>${setsCell}</td>
       <td>${repsCell}</td>
