@@ -36,11 +36,6 @@
   .graph-header strong { font-size: 16px; font-weight: 800; }
   canvas { border-radius: 18px; background: #161616; width: 100%; margin-top: 4px; }
 
-  /* Nutrition checkboxes on Start page */
-  .nutri-check-row { display: flex; gap: 14px; margin: 16px 0; padding: 14px; background: #161616; border-radius: 18px; flex-wrap: wrap; }
-  .nutri-check-row label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #ddd; }
-  .nutri-check-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: #3ddc84; }
-
   /* Selector buttons above table */
   .select-btn-row { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-start; }
   .select-btn { padding: 8px 16px; border: none; background: #161616; color: #aaa; border-radius: 12px; cursor: pointer; font-size: 13px; font-weight: 700; }
@@ -52,15 +47,23 @@
   th { color: #888; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; background: #1c1c1c; }
   tr:last-child td { border-bottom: none; }
 
-  /* Training list as cards (avoids horizontal scrolling on narrow screens) */
-  .ex-card-list { margin-top: 14px; background: #161616; border-radius: 18px; overflow: hidden; }
-  .ex-card { padding: 12px 14px; border-bottom: 1px solid #232323; }
-  .ex-card:last-child { border-bottom: none; }
-  .ex-card .ex-card-top { display: flex; justify-content: space-between; align-items: baseline; }
-  .ex-card .ex-card-name { font-weight: 700; font-size: 15px; color: #f2f2f2; }
-  .ex-card .ex-card-date { font-size: 12px; color: #888; }
-  .ex-card .ex-card-stats { display: flex; gap: 16px; margin-top: 6px; font-size: 13px; color: #ccc; }
-  .ex-card .ex-card-stats b { color: #f2f2f2; }
+  /* Training exercise table */
+  .ex-table-wrap { margin-top: 14px; background: #161616; border-radius: 18px; overflow-x: auto; }
+  .ex-table { width: 100%; border-collapse: collapse; }
+  .ex-table th { color: #888; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+                 background: #1c1c1c; padding: 10px 8px; text-align: left; white-space: nowrap; }
+  .ex-table td { padding: 10px 8px; border-bottom: 1px solid #232323; font-size: 14px; color: #ddd; white-space: nowrap; }
+  .ex-table tr:last-child td { border-bottom: none; }
+  .ex-table td.ex-name-cell { white-space: normal; font-weight: 700; color: #f2f2f2; }
+  .ex-cell { cursor: pointer; border-radius: 8px; padding: 4px 6px; display: inline-block; min-width: 32px; }
+  .ex-cell:active { background: #232323; }
+  .ex-cell.empty { color: #555; }
+  .ex-edit-input { width: 64px; padding: 6px 8px; background: #232323; border: 1px solid #3ddc84;
+                   border-radius: 8px; color: #f2f2f2; font-size: 14px; }
+  .ex-edit-hint { font-size: 10px; color: #3ddc84; display: block; margin-top: 2px; white-space: nowrap; }
+  .ex-del-btn { background: none; border: none; color: #555; font-size: 16px; cursor: pointer; padding: 4px 6px; }
+  .ex-del-btn:active { color: #ff5c5c; }
+  .ex-empty-hint { padding: 20px 14px; color: #666; font-size: 14px; text-align: center; }
 
   /* Floating plus button */
   .fab { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); right: calc(24px + env(safe-area-inset-right));
@@ -82,15 +85,6 @@
   .modal-actions button { flex: 1; padding: 10px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
   .modal-actions button:first-child { background: #232323; color: #ccc; }
   .modal-actions button:last-child { background: #3ddc84; color: #0a0a0a; }
-  .exercise-row { margin-top: 12px; padding-top: 10px; border-top: 1px solid #232323; }
-  .exercise-row:first-child { border-top: none; padding-top: 0; }
-  .exercise-row .ex-top { display: flex; gap: 6px; }
-  .exercise-row .ex-top .ex-name { flex: 1; }
-  .exercise-row .ex-bottom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 6px; }
-  .exercise-row input { width: auto; }
-  .exercise-row button { background: #232323; color: #ccc; border: none; border-radius: 8px; padding: 0 10px; cursor: pointer; }
-  .check-row { display: flex; gap: 15px; margin-top: 10px; }
-  .check-row label { display: flex; align-items: center; gap: 5px; margin-top: 0; }
 </style>
 </head>
 <body>
@@ -115,12 +109,6 @@
   </div>
   <canvas id="mainChart" width="650" height="220"></canvas>
 
-  <div class="nutri-check-row">
-    <label><input type="checkbox" id="s_kcal_ok" onchange="toggleNutri('kcal_ok', this.checked)"> Kalorien erreicht</label>
-    <label><input type="checkbox" id="s_carbs_ok" onchange="toggleNutri('carbs_ok', this.checked)"> Carbs erreicht</label>
-    <label><input type="checkbox" id="s_protein_ok" onchange="toggleNutri('protein_ok', this.checked)"> Protein erreicht</label>
-  </div>
-
   <div class="select-btn-row">
     <button class="select-btn active" data-mode="gewicht" onclick="selectMode('gewicht')">Weight</button>
     <button class="select-btn" data-mode="oberarm" onclick="selectMode('oberarm')">Arms</button>
@@ -140,7 +128,12 @@
     <button class="select-btn" data-cat="pull" onclick="selectTrainingCat('pull')">Pull</button>
     <button class="select-btn" data-cat="legs" onclick="selectTrainingCat('legs')">Legs</button>
   </div>
-  <div class="ex-card-list" id="trainingTableBody"></div>
+  <div class="ex-table-wrap">
+    <table class="ex-table">
+      <thead><tr><th>Übung</th><th>Sätze</th><th>Wdh</th><th>Gewicht</th><th></th></tr></thead>
+      <tbody id="trainingTableBody"></tbody>
+    </table>
+  </div>
 </div>
 
 <button class="fab" onclick="openModal()">+</button>
@@ -161,24 +154,22 @@
   </div>
 </div>
 
-<!-- MODAL: Training tab entry -->
-<div class="modal-overlay" id="trainingModal">
+<!-- MODAL: Training tab - neue Übung hinzufügen (nur Name) -->
+<div class="modal-overlay" id="exerciseModal">
   <div class="modal">
-    <h3>Training eintragen</h3>
-    <label>Datum <input type="date" id="t_datum"></label>
-    <div id="t_exercise_list"></div>
-    <button onclick="addExerciseRow()">+ Übung</button>
+    <h3>Übung hinzufügen</h3>
+    <label>Name der Übung <input type="text" id="ex_new_name" placeholder="z.B. Legpress" autocomplete="off"></label>
     <div class="modal-actions">
-      <button onclick="closeModal('trainingModal')">Abbrechen</button>
-      <button onclick="saveTrainingEntry()">Speichern</button>
+      <button onclick="closeModal('exerciseModal')">Abbrechen</button>
+      <button onclick="saveNewExercise()">Hinzufügen</button>
     </div>
   </div>
 </div>
 
 <script>
-const DAILY_KEY = "fl_daily";       // gewicht, maße, ernährung, kreatin
-const TRAINING_KEY = "fl_training"; // { datum, exercises: [{name, sets, reps, weight}] }
-const EX_KNOWN_KEY = "fl_known_exercises";
+const DAILY_KEY = "fl_daily";           // gewicht, maße
+const OLD_TRAINING_KEY = "fl_training"; // altes Format (Migration)
+const EX_LIST_KEY = "fl_exercises";     // { id, category, name, sets, reps: [], weight: [], datum }
 
 function loadJSON(key) { return JSON.parse(localStorage.getItem(key) || "[]"); }
 function saveJSON(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
@@ -186,6 +177,46 @@ function saveJSON(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 function todayStr() {
   const d = new Date();
   return d.toISOString().split("T")[0];
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function formatDate(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y.slice(2)}`;
+}
+
+function formatWeightList(arr) {
+  const unique = [...new Set(arr)];
+  if (unique.length === 1) return `${unique[0]}kg`;
+  return arr.map(v => `${v}kg`).join(" | ");
+}
+
+// ---------- MIGRATION: altes Trainings-Format -> neue Übungsliste ----------
+function migrateOldTrainingIfNeeded() {
+  if (localStorage.getItem(EX_LIST_KEY)) return; // schon migriert
+  const old = loadJSON(OLD_TRAINING_KEY);
+  if (!old.length) { saveJSON(EX_LIST_KEY, []); return; }
+
+  // pro Kategorie+Name nur den neuesten Eintrag übernehmen
+  const map = {};
+  old.sort((a, b) => a.datum.localeCompare(b.datum)).forEach(day => {
+    (day.exercises || []).forEach(ex => {
+      const key = day.category + "||" + ex.name;
+      const sets = parseInt(ex.sets, 10) || 1;
+      map[key] = {
+        id: uid(),
+        category: day.category,
+        name: ex.name,
+        sets: sets,
+        reps: Array.from({ length: sets }, () => ex.reps || ""),
+        weight: Array.from({ length: sets }, () => ex.weight || ""),
+        datum: day.datum
+      };
+    });
+  });
+  saveJSON(EX_LIST_KEY, Object.values(map));
 }
 
 let currentTab = "start";
@@ -221,23 +252,9 @@ function selectMode(mode) {
 let currentTrainingCat = "push";
 function selectTrainingCat(cat) {
   currentTrainingCat = cat;
+  editState = null;
   document.querySelectorAll("#tab-training .select-btn").forEach(b => b.classList.toggle("active", b.dataset.cat === cat));
   renderTrainingTable();
-}
-
-function toggleNutri(key, checked) {
-  const datum = currentStartDate;
-  let entries = loadJSON(DAILY_KEY);
-  const idx = entries.findIndex(e => e.datum === datum);
-  if (idx >= 0) {
-    entries[idx][key] = checked;
-  } else {
-    entries.push({ datum, [key]: checked });
-    entries.sort((a, b) => a.datum.localeCompare(b.datum));
-  }
-  saveJSON(DAILY_KEY, entries);
-  renderStats();
-  renderChart();
 }
 
 // ---------- MODAL HANDLING ----------
@@ -248,10 +265,9 @@ function openModal() {
     document.getElementById("m_value").value = "";
     document.getElementById("startModal").classList.add("active");
   } else {
-    document.getElementById("t_datum").value = todayStr();
-    document.getElementById("t_exercise_list").innerHTML = "";
-    addExerciseRow();
-    document.getElementById("trainingModal").classList.add("active");
+    document.getElementById("ex_new_name").value = "";
+    document.getElementById("exerciseModal").classList.add("active");
+    setTimeout(() => document.getElementById("ex_new_name").focus(), 50);
   }
 }
 function closeModal(id) {
@@ -280,69 +296,91 @@ function saveStartEntry() {
   renderAll();
 }
 
-// ---------- TRAINING TAB: SAVE ----------
-function addExerciseRow(values) {
-  const container = document.getElementById("t_exercise_list");
-  const known = loadJSON(EX_KNOWN_KEY);
-  const dlId = "ex-options";
-  if (!document.getElementById(dlId)) {
-    const dl = document.createElement("datalist");
-    dl.id = dlId;
-    known.forEach(n => {
-      const o = document.createElement("option");
-      o.value = n;
-      dl.appendChild(o);
-    });
-    document.body.appendChild(dl);
-  }
-  const row = document.createElement("div");
-  row.className = "exercise-row";
-  row.innerHTML = `
-    <div class="ex-top">
-      <input type="text" placeholder="Übung" class="ex-name" list="${dlId}" value="${values?.name || ''}">
-      <button onclick="this.closest('.exercise-row').remove()">x</button>
-    </div>
-    <div class="ex-bottom">
-      <input type="number" placeholder="Sätze" class="ex-sets" value="${values?.sets || ''}">
-      <input type="number" placeholder="Wdh" class="ex-reps" value="${values?.reps || ''}">
-      <input type="number" placeholder="Gewicht" class="ex-weight" value="${values?.weight || ''}">
-    </div>
-  `;
-  container.appendChild(row);
+// ---------- TRAINING TAB: Übungen verwalten ----------
+function saveNewExercise() {
+  const name = document.getElementById("ex_new_name").value.trim();
+  if (!name) { alert("Bitte einen Namen eingeben."); return; }
+  const list = loadJSON(EX_LIST_KEY);
+  list.push({ id: uid(), category: currentTrainingCat, name, sets: null, reps: [], weight: [], datum: null });
+  saveJSON(EX_LIST_KEY, list);
+  closeModal("exerciseModal");
+  renderTrainingTable();
 }
 
-function saveTrainingEntry() {
-  const datum = document.getElementById("t_datum").value;
-  if (!datum) { alert("Bitte Datum wählen."); return; }
-
-  const rows = document.querySelectorAll("#t_exercise_list .exercise-row");
-  const exercises = [];
-  const known = loadJSON(EX_KNOWN_KEY);
-  rows.forEach(row => {
-    const name = row.querySelector(".ex-name").value.trim();
-    if (!name) return;
-    exercises.push({
-      name,
-      sets: row.querySelector(".ex-sets").value,
-      reps: row.querySelector(".ex-reps").value,
-      weight: row.querySelector(".ex-weight").value
-    });
-    if (!known.includes(name)) known.push(name);
-  });
-  saveJSON(EX_KNOWN_KEY, known);
-
-  let entries = loadJSON(TRAINING_KEY);
-  const idx = entries.findIndex(e => e.datum === datum && e.category === currentTrainingCat);
-  if (idx >= 0) {
-    entries[idx].exercises = entries[idx].exercises.concat(exercises);
-  } else {
-    entries.push({ datum, category: currentTrainingCat, exercises });
-  }
-  entries.sort((a, b) => a.datum.localeCompare(b.datum));
-  saveJSON(TRAINING_KEY, entries);
-
-  closeModal("trainingModal");
+function deleteExercise(id) {
+  const list = loadJSON(EX_LIST_KEY);
+  const ex = list.find(e => e.id === id);
+  if (ex && !confirm(`"${ex.name}" löschen?`)) return;
+  saveJSON(EX_LIST_KEY, list.filter(e => e.id !== id));
+  if (editState && editState.id === id) editState = null;
   renderTrainingTable();
+}
+
+// ---------- TRAINING TAB: Klick-zum-Bearbeiten mit Enter-Sprung ----------
+// editState.stage: 'sets' | 'reps' | 'weight'
+let editState = null;
+
+function beginEdit(id, stage) {
+  const list = loadJSON(EX_LIST_KEY);
+  const ex = list.find(e => e.id === id);
+  if (!ex) return;
+
+  if (stage === "sets" || !ex.sets) {
+    editState = { id, stage: "sets", index: 0, sets: null, tempReps: [], tempWeight: [] };
+  } else if (stage === "reps") {
+    editState = { id, stage: "reps", index: 0, sets: ex.sets, tempReps: [], tempWeight: [] };
+  } else if (stage === "weight") {
+    editState = { id, stage: "weight", index: 0, sets: ex.sets, tempReps: ex.reps.slice(), tempWeight: [] };
+  }
+  renderTrainingTable();
+}
+
+function handleEditKey(e) {
+  if (e.key === "Escape") { editState = null; renderTrainingTable(); return; }
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  commitEditStep(e.target.value);
+}
+
+function commitEditStep(rawVal) {
+  const list = loadJSON(EX_LIST_KEY);
+  const idx = list.findIndex(e => e.id === editState.id);
+  if (idx < 0) { editState = null; renderTrainingTable(); return; }
+
+  if (editState.stage === "sets") {
+    const n = parseInt(rawVal, 10);
+    if (!n || n < 1) { editState = null; renderTrainingTable(); return; }
+    editState.sets = n;
+    editState.stage = "reps";
+    editState.index = 0;
+    renderTrainingTable();
+    return;
+  }
+
+  if (editState.stage === "reps") {
+    editState.tempReps[editState.index] = rawVal;
+    editState.index++;
+    if (editState.index < editState.sets) { renderTrainingTable(); return; }
+    editState.stage = "weight";
+    editState.index = 0;
+    renderTrainingTable();
+    return;
+  }
+
+  if (editState.stage === "weight") {
+    editState.tempWeight[editState.index] = rawVal;
+    editState.index++;
+    if (editState.index < editState.sets) { renderTrainingTable(); return; }
+    // fertig -> speichern
+    list[idx].sets = editState.sets;
+    list[idx].reps = editState.tempReps;
+    list[idx].weight = editState.tempWeight;
+    list[idx].datum = todayStr();
+    saveJSON(EX_LIST_KEY, list);
+    editState = null;
+    renderTrainingTable();
+    return;
+  }
 }
 
 // ---------- RENDER: STATS ----------
@@ -350,22 +388,15 @@ function renderStats() {
   const entries = loadJSON(DAILY_KEY);
   const last = entries[entries.length - 1] || {};
 
-  const todayEntry = entries.find(e => e.datum === currentStartDate) || {};
-  document.getElementById("s_kcal_ok").checked = !!todayEntry.kcal_ok;
-  document.getElementById("s_carbs_ok").checked = !!todayEntry.carbs_ok;
-  document.getElementById("s_protein_ok").checked = !!todayEntry.protein_ok;
-  const box = (label, value, ok) => `
+  const box = (label, value) => `
     <div class="stat-box">
       <div class="label">${label}</div>
-      <div class="value ${ok === true ? 'stat-ok' : ok === false ? 'stat-bad' : ''}">${value}</div>
+      <div class="value">${value}</div>
     </div>`;
   document.getElementById("statsRow").innerHTML =
     box("Gewicht", last.gewicht ? last.gewicht + " kg" : "-") +
     box("Oberarm", last.oberarm ? last.oberarm + " cm" : "-") +
-    box("Brust", last.brust ? last.brust + " cm" : "-") +
-    box("Kcal", last.kcal_ok === undefined ? "-" : (last.kcal_ok ? "✓" : "✗"), last.kcal_ok) +
-    box("Carbs", last.carbs_ok === undefined ? "-" : (last.carbs_ok ? "✓" : "✗"), last.carbs_ok) +
-    box("Protein", last.protein_ok === undefined ? "-" : (last.protein_ok ? "✓" : "✗"), last.protein_ok);
+    box("Brust", last.brust ? last.brust + " cm" : "-");
 }
 
 // ---------- RENDER: TABLE (Start tab, filtered by graph selection) ----------
@@ -377,44 +408,79 @@ function renderStartTable() {
   if (mode === "gewicht") {
     head.innerHTML = "<th>Datum</th><th>Gewicht</th>";
     const entries = loadJSON(DAILY_KEY).filter(e => e.gewicht).sort((a, b) => b.datum.localeCompare(a.datum));
-    body.innerHTML = entries.map(e => `<tr><td>${e.datum}</td><td>${e.gewicht} kg</td></tr>`).join("");
+    body.innerHTML = entries.map(e => `<tr><td>${formatDate(e.datum)}</td><td>${e.gewicht} kg</td></tr>`).join("");
   } else if (mode === "oberarm") {
     head.innerHTML = "<th>Datum</th><th>Oberarm</th>";
     const entries = loadJSON(DAILY_KEY).filter(e => e.oberarm).sort((a, b) => b.datum.localeCompare(a.datum));
-    body.innerHTML = entries.map(e => `<tr><td>${e.datum}</td><td>${e.oberarm} cm</td></tr>`).join("");
+    body.innerHTML = entries.map(e => `<tr><td>${formatDate(e.datum)}</td><td>${e.oberarm} cm</td></tr>`).join("");
   } else if (mode === "brust") {
     head.innerHTML = "<th>Datum</th><th>Brust</th>";
     const entries = loadJSON(DAILY_KEY).filter(e => e.brust).sort((a, b) => b.datum.localeCompare(a.datum));
-    body.innerHTML = entries.map(e => `<tr><td>${e.datum}</td><td>${e.brust} cm</td></tr>`).join("");
+    body.innerHTML = entries.map(e => `<tr><td>${formatDate(e.datum)}</td><td>${e.brust} cm</td></tr>`).join("");
   }
 }
 
 // ---------- RENDER: TRAINING TABLE ----------
 function renderTrainingTable() {
   const body = document.getElementById("trainingTableBody");
-  const rows = [];
-  const catEntries = loadJSON(TRAINING_KEY)
-    .filter(e => e.category === currentTrainingCat)
-    .sort((a, b) => b.datum.localeCompare(a.datum));
+  const list = loadJSON(EX_LIST_KEY).filter(e => e.category === currentTrainingCat);
 
-  const last = catEntries[0]; // nur der zuletzt eingetragene Tag dieser Kategorie
-  if (last) {
-    last.exercises.forEach(ex => {
-      rows.push(`
-        <div class="ex-card">
-          <div class="ex-card-top">
-            <span class="ex-card-name">${ex.name}</span>
-            <span class="ex-card-date">${last.datum}</span>
-          </div>
-          <div class="ex-card-stats">
-            <span>Sätze <b>${ex.sets}</b></span>
-            <span>Wdh <b>${ex.reps}</b></span>
-            <span>Gewicht <b>${ex.weight} kg</b></span>
-          </div>
-        </div>`);
-    });
+  if (!list.length) {
+    body.innerHTML = `<tr><td colspan="5" class="ex-empty-hint">Noch keine Übungen. Mit + eine hinzufügen.</td></tr>`;
+    return;
   }
-  body.innerHTML = rows.join("");
+
+  const editing = editState;
+
+  body.innerHTML = list.map(ex => {
+    const isEditingRow = editing && editing.id === ex.id;
+
+    // ---- Sätze-Zelle ----
+    let setsCell;
+    if (isEditingRow && editing.stage === "sets") {
+      setsCell = `<input class="ex-edit-input" id="editInput" type="number" inputmode="numeric" placeholder="Sätze"
+                    onkeydown="handleEditKey(event)">`;
+    } else {
+      setsCell = ex.sets
+        ? `<span class="ex-cell" onclick="beginEdit('${ex.id}','sets')">${ex.sets}</span>`
+        : `<span class="ex-cell empty" onclick="beginEdit('${ex.id}','sets')">-</span>`;
+    }
+
+    // ---- Wdh-Zelle ----
+    let repsCell;
+    if (isEditingRow && editing.stage === "reps") {
+      repsCell = `<input class="ex-edit-input" id="editInput" type="number" inputmode="numeric"
+                    placeholder="Satz ${editing.index + 1}/${editing.sets}" onkeydown="handleEditKey(event)">
+                  <span class="ex-edit-hint">Satz ${editing.index + 1} von ${editing.sets}</span>`;
+    } else if (ex.reps && ex.reps.length) {
+      repsCell = `<span class="ex-cell" onclick="beginEdit('${ex.id}','reps')">${ex.reps.join(" | ")}</span>`;
+    } else {
+      repsCell = `<span class="ex-cell empty" onclick="beginEdit('${ex.id}','reps')">-</span>`;
+    }
+
+    // ---- Gewicht-Zelle ----
+    let weightCell;
+    if (isEditingRow && editing.stage === "weight") {
+      weightCell = `<input class="ex-edit-input" id="editInput" type="number" step="0.5" inputmode="decimal"
+                     placeholder="Satz ${editing.index + 1}/${editing.sets}" onkeydown="handleEditKey(event)">
+                    <span class="ex-edit-hint">Satz ${editing.index + 1} von ${editing.sets}</span>`;
+    } else if (ex.weight && ex.weight.length) {
+      weightCell = `<span class="ex-cell" onclick="beginEdit('${ex.id}','weight')">${formatWeightList(ex.weight)}</span>`;
+    } else {
+      weightCell = `<span class="ex-cell empty" onclick="beginEdit('${ex.id}','weight')">-</span>`;
+    }
+
+    return `<tr>
+      <td class="ex-name-cell">${ex.name}</td>
+      <td>${setsCell}</td>
+      <td>${repsCell}</td>
+      <td>${weightCell}</td>
+      <td><button class="ex-del-btn" onclick="deleteExercise('${ex.id}')">✕</button></td>
+    </tr>`;
+  }).join("");
+
+  const activeInput = document.getElementById("editInput");
+  if (activeInput) activeInput.focus();
 }
 
 // ---------- CHART ----------
@@ -438,9 +504,8 @@ function renderChart() {
   else if (mode === "oberarm") points = daily.filter(e => e.oberarm).map(e => ({ datum: e.datum, val: parseFloat(e.oberarm) }));
   else if (mode === "brust") points = daily.filter(e => e.brust).map(e => ({ datum: e.datum, val: parseFloat(e.brust) }));
 
-  const stripeHeight = 30;
   const padding = 30;
-  const chartH = cssHeight - padding - stripeHeight - 20;
+  const chartH = cssHeight - padding - 20;
   const w = cssWidth - padding * 2;
 
   // Build a date -> x mapping based on actual elapsed time, not index position
@@ -484,33 +549,6 @@ function renderChart() {
     ctx.fillText(max.toFixed(1), 2, 15);
     ctx.fillText(min.toFixed(1), 2, chartH);
   }
-
-  // Nutrition stripes: aligned to the same real-date x-axis as the graph above,
-  // so an unchecked day only creates a gap at that day, not the whole stripe.
-  const nutriEntries = [...daily].sort((a, b) => a.datum.localeCompare(b.datum));
-  if (nutriEntries.length > 0) {
-    const rows = [
-      { key: "kcal_ok", color: "#2ecc71", y: chartH + 10 },
-      { key: "carbs_ok", color: "#e91e8c", y: chartH + 18 },
-      { key: "protein_ok", color: "#3498db", y: chartH + 26 }
-    ];
-    const slot = nutriEntries.length > 1 ? w / nutriEntries.length : w * 0.05;
-    rows.forEach(r => {
-      ctx.strokeStyle = r.color;
-      ctx.lineWidth = 3;
-      nutriEntries.forEach((e) => {
-        if (e[r.key]) {
-          const x1 = xForDate(e.datum) - slot / 2;
-          const x2 = xForDate(e.datum) + slot / 2;
-          ctx.beginPath();
-          ctx.moveTo(Math.max(x1, padding), r.y);
-          ctx.lineTo(Math.min(x2, cssWidth - padding), r.y);
-          ctx.stroke();
-        }
-      });
-    });
-    ctx.lineWidth = 1;
-  }
 }
 
 function renderAll() {
@@ -519,6 +557,7 @@ function renderAll() {
   renderChart();
 }
 
+migrateOldTrainingIfNeeded();
 document.getElementById("startDate").value = todayStr();
 renderAll();
 </script>
