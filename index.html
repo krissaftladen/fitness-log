@@ -15,6 +15,19 @@
   }
   h2 { font-weight: 800; font-size: 28px; margin-bottom: 16px; letter-spacing: -0.5px; }
 
+  .backup-row { display: flex; gap: 8px; margin: -8px 0 16px; }
+  .backup-btn { background: #161616; color: #888; border: none; padding: 6px 12px; border-radius: 10px;
+                font-size: 12px; font-weight: 700; cursor: pointer; display: inline-block; }
+  .backup-btn:active { background: #232323; color: #ccc; }
+
+  .backup-reminder { background: #1c1c1c; border: 1px solid #333; border-radius: 14px; padding: 12px 14px;
+                      margin: -6px 0 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .backup-reminder span { font-size: 13px; color: #ccc; }
+  .backup-reminder-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .backup-reminder-actions button { border: none; border-radius: 10px; padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .backup-reminder-actions button:first-child { background: #3ddc84; color: #0a0a0a; }
+  .backup-reminder-actions button:last-child { background: #232323; color: #aaa; }
+
   /* Tabs */
   .tabs { display: flex; gap: 8px; margin-bottom: 18px; background: #161616; padding: 6px; border-radius: 16px; }
   .tab-btn { flex: 1; padding: 10px; background: none; border: none; font-size: 15px; font-weight: 700;
@@ -46,6 +59,8 @@
   td, th { border: none; border-bottom: 1px solid #232323; padding: 10px 14px; font-size: 14px; text-align: left; color: #ddd; }
   th { color: #888; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; background: #1c1c1c; }
   tr:last-child td { border-bottom: none; }
+  .month-sep-row td { background: #1c1c1c; padding: 8px 14px; border-bottom: 1px solid #232323; }
+  .month-sep { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #aaa; font-weight: 700; }
 
   /* Training exercise table */
   .ex-table-wrap { margin-top: 14px; background: #161616; border-radius: 18px; overflow-x: auto; }
@@ -93,6 +108,20 @@
 <body>
 
 <h2>Fitness Log</h2>
+
+<div class="backup-row">
+  <button class="backup-btn" onclick="exportBackup()">⬇ Backup</button>
+  <label class="backup-btn" for="importFile">⬆ Wiederherstellen</label>
+  <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importBackupFile(this)">
+</div>
+
+<div class="backup-reminder" id="backupReminder" style="display:none;">
+  <span id="backupReminderText"></span>
+  <div class="backup-reminder-actions">
+    <button onclick="exportBackup()">Jetzt sichern</button>
+    <button onclick="dismissBackupReminder()">Später</button>
+  </div>
+</div>
 
 <div class="tabs">
   <button class="tab-btn active" onclick="switchTab('start')">Start</button>
@@ -196,6 +225,86 @@ function formatWeightList(arr) {
   return arr.map(v => `${v}kg`).join(" | ");
 }
 
+// ---------- BACKUP / WIEDERHERSTELLEN ----------
+const LAST_BACKUP_KEY = "fl_last_backup";
+const BACKUP_DISMISS_KEY = "fl_backup_dismissed";
+const BACKUP_REMINDER_DAYS = 7;
+
+function exportBackup() {
+  const data = {
+    daily: loadJSON(DAILY_KEY),
+    exercises: loadJSON(EX_LIST_KEY),
+    exportedAt: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `fitnesslog-backup-${todayStr()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+
+  localStorage.setItem(LAST_BACKUP_KEY, todayStr());
+  localStorage.removeItem(BACKUP_DISMISS_KEY);
+  renderBackupReminder();
+}
+
+function dismissBackupReminder() {
+  localStorage.setItem(BACKUP_DISMISS_KEY, todayStr());
+  renderBackupReminder();
+}
+
+function daysSince(dateStr) {
+  const then = new Date(dateStr);
+  const now = new Date(todayStr());
+  return Math.floor((now - then) / (1000 * 60 * 60 * 24));
+}
+
+function renderBackupReminder() {
+  const box = document.getElementById("backupReminder");
+  const textEl = document.getElementById("backupReminderText");
+  if (!box) return;
+
+  const lastBackup = localStorage.getItem(LAST_BACKUP_KEY);
+  const dismissedAt = localStorage.getItem(BACKUP_DISMISS_KEY);
+
+  // Heute schon weggeklickt? Dann nicht erneut anzeigen (bis morgen).
+  if (dismissedAt === todayStr()) { box.style.display = "none"; return; }
+
+  const daysSinceBackup = lastBackup ? daysSince(lastBackup) : Infinity;
+  if (daysSinceBackup < BACKUP_REMINDER_DAYS) { box.style.display = "none"; return; }
+
+  textEl.textContent = lastBackup
+    ? `Letztes Backup vor ${daysSinceBackup} Tagen.`
+    : "Noch kein Backup erstellt.";
+  box.style.display = "flex";
+}
+
+function importBackupFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!Array.isArray(data.daily) || !Array.isArray(data.exercises)) throw new Error("ungültiges Format");
+      const datePart = data.exportedAt ? formatDate(data.exportedAt.slice(0, 10)) : "unbekanntem Datum";
+      if (!confirm(`Aktuelle Daten mit Backup vom ${datePart} überschreiben?`)) { input.value = ""; return; }
+      saveJSON(DAILY_KEY, data.daily);
+      saveJSON(EX_LIST_KEY, data.exercises);
+      renderAll();
+      renderTrainingTable();
+      alert("Backup wiederhergestellt.");
+    } catch (err) {
+      alert("Datei konnte nicht gelesen werden: ungültiges Backup-Format.");
+    }
+    input.value = "";
+  };
+  reader.readAsText(file);
+}
+
 // ---------- MIGRATION: altes Trainings-Format -> neue Übungsliste ----------
 function migrateOldTrainingIfNeeded() {
   if (localStorage.getItem(EX_LIST_KEY)) return; // schon migriert
@@ -215,7 +324,10 @@ function migrateOldTrainingIfNeeded() {
         sets: sets,
         reps: Array.from({ length: sets }, () => ex.reps || ""),
         weight: Array.from({ length: sets }, () => ex.weight || ""),
-        datum: day.datum
+        datum: day.datum,
+        bestWeight: null,
+        bestReps: null,
+        isPR: false
       };
     });
   });
@@ -304,7 +416,8 @@ function saveNewExercise() {
   const name = document.getElementById("ex_new_name").value.trim();
   if (!name) { alert("Bitte einen Namen eingeben."); return; }
   const list = loadJSON(EX_LIST_KEY);
-  list.push({ id: uid(), category: currentTrainingCat, name, sets: null, reps: [], weight: [], datum: null });
+  list.push({ id: uid(), category: currentTrainingCat, name, sets: null, reps: [], weight: [], datum: null,
+              bestWeight: null, bestReps: null, isPR: false });
   saveJSON(EX_LIST_KEY, list);
   closeModal("exerciseModal");
   renderTrainingTable();
@@ -383,10 +496,19 @@ function commitEditStep(rawVal) {
     editState.index++;
     if (editState.index < editState.sets) { renderTrainingTable(); return; }
     // fertig -> speichern
+    const maxW = Math.max(...editState.tempWeight.map(Number).filter(n => !isNaN(n)));
+    const maxR = Math.max(...editState.tempReps.map(Number).filter(n => !isNaN(n)));
+    const prevBestW = list[idx].bestWeight;
+    const prevBestR = list[idx].bestReps;
+    const isNewPR = (prevBestW != null && maxW > prevBestW) || (prevBestR != null && maxR > prevBestR);
+
     list[idx].sets = editState.sets;
     list[idx].reps = editState.tempReps;
     list[idx].weight = editState.tempWeight;
     list[idx].datum = todayStr();
+    list[idx].bestWeight = Math.max(prevBestW || 0, isFinite(maxW) ? maxW : 0);
+    list[idx].bestReps = Math.max(prevBestR || 0, isFinite(maxR) ? maxR : 0);
+    list[idx].isPR = isNewPR;
     saveJSON(EX_LIST_KEY, list);
     editState = null;
     renderTrainingTable();
@@ -438,18 +560,75 @@ function renderStats() {
   const entries = loadJSON(DAILY_KEY);
   const last = entries[entries.length - 1] || {};
 
+  const gewichtEntries = entries.filter(e => e.gewicht);
+  let gewichtDiffHTML = "";
+  if (gewichtEntries.length >= 2) {
+    const diff = parseFloat(gewichtEntries[gewichtEntries.length - 1].gewicht) - parseFloat(gewichtEntries[gewichtEntries.length - 2].gewicht);
+    const sign = diff > 0 ? "+" : "";
+    gewichtDiffHTML = ` <span style="font-size:12px; font-weight:600; color:#888;">(${sign}${diff.toFixed(1)})</span>`;
+  }
+
   const box = (label, value) => `
     <div class="stat-box">
       <div class="label">${label}</div>
       <div class="value">${value}</div>
     </div>`;
   document.getElementById("statsRow").innerHTML =
-    box("Gewicht", last.gewicht ? last.gewicht + " kg" : "-") +
+    box("Gewicht", last.gewicht ? last.gewicht + " kg" + gewichtDiffHTML : "-") +
     box("Oberarm", last.oberarm ? last.oberarm + " cm" : "-") +
     box("Brust", last.brust ? last.brust + " cm" : "-");
 }
 
 // ---------- RENDER: TABLE (Start tab, filtered by graph selection) ----------
+const MONTH_NAMES = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+
+function monthLabel(monthKey) {
+  const [y, m] = monthKey.split("-");
+  return `${MONTH_NAMES[parseInt(m, 10) - 1]} ${y.slice(2)}`;
+}
+
+function buildTableRowsWithMonthAverages(entries, valueKey, unit) {
+  // entries: bereits absteigend nach Datum sortiert (neueste zuerst)
+  const monthSums = {};
+  entries.forEach(e => {
+    const mKey = e.datum.slice(0, 7);
+    const v = parseFloat(e[valueKey]);
+    if (isNaN(v)) return;
+    if (!monthSums[mKey]) monthSums[mKey] = { sum: 0, count: 0 };
+    monthSums[mKey].sum += v;
+    monthSums[mKey].count++;
+  });
+  const monthKeysAsc = Object.keys(monthSums).sort();
+  const avgFor = k => monthSums[k].sum / monthSums[k].count;
+
+  const sepRow = (monthKey) => {
+    const idx = monthKeysAsc.indexOf(monthKey);
+    const olderKey = monthKeysAsc[idx - 1];
+    const avg = avgFor(monthKey);
+    let diffHTML = "";
+    if (olderKey) {
+      const diff = avg - avgFor(olderKey);
+      const color = diff > 0 ? "#3ddc84" : (diff < 0 ? "#ff5c5c" : "#888");
+      const sign = diff > 0 ? "+" : "";
+      diffHTML = `<span style="color:${color}; font-weight:700;">${sign}${diff.toFixed(1)} ${unit}</span>`;
+    }
+    return `<tr class="month-sep-row"><td colspan="2">
+      <div class="month-sep"><span>Ø ${monthLabel(monthKey)}: ${avg.toFixed(1)} ${unit}</span>${diffHTML}</div>
+    </td></tr>`;
+  };
+
+  let html = "";
+  let lastMonth = null;
+  entries.forEach(e => {
+    const mKey = e.datum.slice(0, 7);
+    if (lastMonth !== null && mKey !== lastMonth) html += sepRow(lastMonth);
+    const v = e[valueKey];
+    html += `<tr><td>${formatDate(e.datum)}</td><td>${v} ${unit}</td></tr>`;
+    lastMonth = mKey;
+  });
+  return html;
+}
+
 function renderStartTable() {
   const mode = currentMode;
   const head = document.getElementById("startTableHead");
@@ -458,15 +637,15 @@ function renderStartTable() {
   if (mode === "gewicht") {
     head.innerHTML = "<th>Datum</th><th>Gewicht</th>";
     const entries = loadJSON(DAILY_KEY).filter(e => e.gewicht).sort((a, b) => b.datum.localeCompare(a.datum));
-    body.innerHTML = entries.map(e => `<tr><td>${formatDate(e.datum)}</td><td>${e.gewicht} kg</td></tr>`).join("");
+    body.innerHTML = buildTableRowsWithMonthAverages(entries, "gewicht", "kg");
   } else if (mode === "oberarm") {
     head.innerHTML = "<th>Datum</th><th>Oberarm</th>";
     const entries = loadJSON(DAILY_KEY).filter(e => e.oberarm).sort((a, b) => b.datum.localeCompare(a.datum));
-    body.innerHTML = entries.map(e => `<tr><td>${formatDate(e.datum)}</td><td>${e.oberarm} cm</td></tr>`).join("");
+    body.innerHTML = buildTableRowsWithMonthAverages(entries, "oberarm", "cm");
   } else if (mode === "brust") {
     head.innerHTML = "<th>Datum</th><th>Brust</th>";
     const entries = loadJSON(DAILY_KEY).filter(e => e.brust).sort((a, b) => b.datum.localeCompare(a.datum));
-    body.innerHTML = entries.map(e => `<tr><td>${formatDate(e.datum)}</td><td>${e.brust} cm</td></tr>`).join("");
+    body.innerHTML = buildTableRowsWithMonthAverages(entries, "brust", "cm");
   }
 }
 
@@ -524,7 +703,7 @@ function renderTrainingTable() {
 
     return `<tr data-id="${ex.id}" class="${isDragging ? 'dragging' : ''}">
       <td><span class="ex-drag-handle" onpointerdown="onDragHandleDown(event,'${ex.id}')">⠿</span></td>
-      <td class="ex-name-cell">${ex.name}</td>
+      <td class="ex-name-cell">${ex.name}${ex.isPR ? ' <span title="Neue Bestleistung">🏆</span>' : ''}</td>
       <td>${setsCell}</td>
       <td>${repsCell}</td>
       <td>${weightCell}</td>
@@ -613,6 +792,7 @@ function renderAll() {
 migrateOldTrainingIfNeeded();
 document.getElementById("startDate").value = todayStr();
 renderAll();
+renderBackupReminder();
 </script>
 
 </body>
