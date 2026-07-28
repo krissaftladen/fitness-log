@@ -676,7 +676,7 @@ function renderTrainingTable() {
     // ---- Sätze-Zelle ----
     let setsCell;
     if (isEditingRow && editing.stage === "sets") {
-      setsCell = `<input class="ex-edit-input" id="editInput" type="number" inputmode="numeric" placeholder="${editing.prevSets || 'Sätze'}"
+      setsCell = `<input class="ex-edit-input" id="editInput" type="text" inputmode="text" placeholder="${editing.prevSets || 'Sätze'}"
                     onkeydown="handleEditKey(event)">`;
     } else {
       setsCell = ex.sets
@@ -687,7 +687,7 @@ function renderTrainingTable() {
     // ---- Wdh-Zelle ----
     let repsCell;
     if (isEditingRow && editing.stage === "reps") {
-      repsCell = `<input class="ex-edit-input" id="editInput" type="number" inputmode="numeric"
+      repsCell = `<input class="ex-edit-input" id="editInput" type="text" inputmode="text"
                     placeholder="${editing.prevReps[editing.index] !== undefined ? editing.prevReps[editing.index] : 'Satz ' + (editing.index + 1)}" onkeydown="handleEditKey(event)">
                   <span class="ex-edit-hint">Satz ${editing.index + 1} von ${editing.sets}</span>`;
     } else if (ex.reps && ex.reps.length) {
@@ -699,7 +699,7 @@ function renderTrainingTable() {
     // ---- Gewicht-Zelle ----
     let weightCell;
     if (isEditingRow && editing.stage === "weight") {
-      weightCell = `<input class="ex-edit-input" id="editInput" type="number" step="0.5" inputmode="decimal"
+      weightCell = `<input class="ex-edit-input" id="editInput" type="text" inputmode="text"
                      placeholder="${editing.prevWeight[editing.index] !== undefined ? editing.prevWeight[editing.index] : 'Satz ' + (editing.index + 1)}" onkeydown="handleEditKey(event)">
                     <span class="ex-edit-hint">Satz ${editing.index + 1} von ${editing.sets}</span>`;
     } else if (ex.weight && ex.weight.length) {
