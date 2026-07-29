@@ -82,7 +82,8 @@ body {
   .ex-del-btn { background: none; border: none; color: #555; font-size: 16px; cursor: pointer; padding: 4px 6px; }
   .ex-del-btn:active { color: #ff5c5c; }
   .ex-empty-hint { padding: 20px 14px; color: #666; font-size: 14px; text-align: center; }
-  .ex-drag-handle { cursor: grab; color: #555; font-size: 18px; padding: 4px 8px; touch-action: none; user-select: none; }
+  .ex-table th:first-child, .ex-table td.ex-handle-cell { width: 28px; padding-left: 10px; padding-right: 0; }
+  .ex-drag-handle { cursor: grab; color: #555; font-size: 18px; padding: 4px 6px; touch-action: none; user-select: none; display: inline-block; }
   .ex-table tr.dragging { opacity: 0.4; }
 
   /* Floating plus button */
@@ -708,13 +709,19 @@ function renderTrainingTable() {
       weightCell = `<span class="ex-cell empty" onclick="beginEdit('${ex.id}','weight')">-</span>`;
     }
 
+    // ---- Wdh-Zelle: grün unterstreichen, wenn irgendein Satz >= 12 Wdh (progressive overload) ----
+    let repsHasHighRep = false;
+    if (!isEditingRow && ex.reps && ex.reps.length) {
+      repsHasHighRep = ex.reps.some(r => parseInt(r, 10) >= 12);
+    }
+
     const isDragging = dragId === ex.id;
 
     return `<tr data-id="${ex.id}" class="${isDragging ? 'dragging' : ''}">
-      <td><span class="ex-drag-handle" onpointerdown="onDragHandleDown(event,'${ex.id}')">⠿</span></td>
-      <td class="ex-name-cell">${ex.name}${ex.isPR ? ' <span title="Neue Bestleistung">🏆</span>' : ''}</td>
+      <td class="ex-handle-cell"><span class="ex-drag-handle" onpointerdown="onDragHandleDown(event,'${ex.id}')">${ex.isPR ? '🏆' : '⠿'}</span></td>
+      <td class="ex-name-cell">${ex.name}</td>
       <td>${setsCell}</td>
-      <td>${repsCell}</td>
+      <td${repsHasHighRep ? ' style="text-decoration: underline; text-decoration-color: #3ddc84; text-decoration-thickness: 2px;"' : ''}>${repsCell}</td>
       <td>${weightCell}</td>
       <td><button class="ex-del-btn" onclick="deleteExercise('${ex.id}')">✕</button></td>
     </tr>`;
