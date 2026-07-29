@@ -66,7 +66,7 @@ body {
 
   /* Training exercise table */
   .ex-table-wrap { margin-top: 14px; background: #161616; border-radius: 18px; overflow-x: auto; }
-  .ex-table { width: 100%; border-collapse: collapse; }
+  .ex-table { width: 100%; border-collapse: collapse; margin-top: 0; }
   .ex-table th { color: #888; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
                  background: #1c1c1c; padding: 10px 8px; text-align: left; white-space: nowrap; }
   .ex-table td { padding: 10px 8px; border-bottom: 1px solid #232323; font-size: 14px; color: #ddd; white-space: nowrap; }
@@ -90,7 +90,8 @@ body {
   .fab { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); right: calc(24px + env(safe-area-inset-right));
          width: 58px; height: 58px; border-radius: 50%; z-index: 500;
          background: #f2f2f2; color: #0a0a0a; font-size: 30px; font-weight: 700; border: none; cursor: pointer;
-         box-shadow: 0 4px 14px rgba(0,0,0,0.5); }
+         box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+         display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; }
 
   /* Modal */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
@@ -142,7 +143,6 @@ body {
 
   <div class="graph-header">
     <strong>Verlauf</strong>
-    <button id="smoothToggleBtn" onclick="toggleChartSmoothing()" style="background:#232323; color:#ccc; border:none; border-radius:10px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer;">smoothed off</button>
   </div>
   <canvas id="mainChart" width="650" height="220"></canvas>
 
@@ -733,25 +733,8 @@ function renderTrainingTable() {
 
 // ---------- CHART ----------
 const CHART_BASE_HEIGHT = 220; // feste Basishöhe, NICHT aus canvas.height lesen (das wächst sonst exponentiell)
-const CHART_SMOOTH_KEY = "fl_chart_smooth";
-
-function toggleChartSmoothing() {
-  const on = localStorage.getItem(CHART_SMOOTH_KEY) === "1";
-  localStorage.setItem(CHART_SMOOTH_KEY, on ? "0" : "1");
-  renderChart();
-}
-
-function updateSmoothToggleBtn() {
-  const btn = document.getElementById("smoothToggleBtn");
-  if (!btn) return;
-  const on = localStorage.getItem(CHART_SMOOTH_KEY) === "1";
-  btn.textContent = on ? "smoothed on" : "smoothed off";
-  btn.style.background = on ? "#3ddc84" : "#232323";
-  btn.style.color = on ? "#0a0a0a" : "#ccc";
-}
 
 function renderChart() {
-  updateSmoothToggleBtn();
   const canvas = document.getElementById("mainChart");
   const ctx = canvas.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
@@ -771,8 +754,9 @@ function renderChart() {
   else if (mode === "oberarm") points = daily.filter(e => e.oberarm).map(e => ({ datum: e.datum, val: parseFloat(e.oberarm) }));
   else if (mode === "brust") points = daily.filter(e => e.brust).map(e => ({ datum: e.datum, val: parseFloat(e.brust) }));
 
-  const padding = 30;
-  const chartH = cssHeight - padding - 20;
+  const padding = 38; // Platz links/rechts (u.a. für Achsen-Zahlen)
+  const bottomPad = 22; // nur so viel Platz unten wie für die Achsen-Beschriftung nötig
+  const chartH = cssHeight - bottomPad;
   const w = cssWidth - padding * 2;
 
   // Build a date -> x mapping based on actual elapsed time, not index position
@@ -804,33 +788,18 @@ function renderChart() {
     ctx.beginPath();
     ctx.strokeStyle = "#3ddc84";
     ctx.lineWidth = 2;
-    const smoothOn = localStorage.getItem(CHART_SMOOTH_KEY) === "1";
-    const coords = points.map(p => ({ x: xForDate(p.datum), y: chartH - ((p.val - min) / (max - min)) * (chartH - 20) }));
-
-    if (!smoothOn || coords.length < 3) {
-      coords.forEach((c, i) => { if (i === 0) ctx.moveTo(c.x, c.y); else ctx.lineTo(c.x, c.y); });
-    } else {
-      // Sanfte Kurve durch die exakten Datenpunkte (Catmull-Rom -> Bezier).
-      // Die Punkte selbst werden NICHT verändert, nur die Verbindungslinie wird geglättet.
-      ctx.moveTo(coords[0].x, coords[0].y);
-      for (let i = 0; i < coords.length - 1; i++) {
-        const p0 = coords[i - 1] || coords[i];
-        const p1 = coords[i];
-        const p2 = coords[i + 1];
-        const p3 = coords[i + 2] || p2;
-        const cp1x = p1.x + (p2.x - p0.x) / 6;
-        const cp1y = p1.y + (p2.y - p0.y) / 6;
-        const cp2x = p2.x - (p3.x - p1.x) / 6;
-        const cp2y = p2.y - (p3.y - p1.y) / 6;
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
-      }
-    }
+    points.forEach((p, i) => {
+      const x = xForDate(p.datum);
+      const y = chartH - ((p.val - min) / (max - min)) * (chartH - 20);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
     ctx.stroke();
     ctx.lineWidth = 1;
 
     ctx.fillStyle = "#888888";
-    ctx.fillText(max.toFixed(1), 2, 15);
-    ctx.fillText(min.toFixed(1), 2, chartH);
+    ctx.font = "12px -apple-system, sans-serif";
+    ctx.fillText(max.toFixed(1), 6, 15);
+    ctx.fillText(min.toFixed(1), 6, chartH);
   }
 }
 
