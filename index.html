@@ -143,6 +143,7 @@ body {
 
   <div class="graph-header">
     <strong>Verlauf</strong>
+    <button id="smoothToggleBtn" onclick="toggleChartSmoothing()" style="background:#232323; color:#ccc; border:none; border-radius:10px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer;">smoothed off</button>
   </div>
   <canvas id="mainChart" width="650" height="220"></canvas>
 
@@ -733,8 +734,25 @@ function renderTrainingTable() {
 
 // ---------- CHART ----------
 const CHART_BASE_HEIGHT = 220; // feste Basishöhe, NICHT aus canvas.height lesen (das wächst sonst exponentiell)
+const CHART_SMOOTH_KEY = "fl_chart_smooth";
+
+function toggleChartSmoothing() {
+  const on = localStorage.getItem(CHART_SMOOTH_KEY) === "1";
+  localStorage.setItem(CHART_SMOOTH_KEY, on ? "0" : "1");
+  renderChart();
+}
+
+function updateSmoothToggleBtn() {
+  const btn = document.getElementById("smoothToggleBtn");
+  if (!btn) return;
+  const on = localStorage.getItem(CHART_SMOOTH_KEY) === "1";
+  btn.textContent = on ? "smoothed on" : "smoothed off";
+  btn.style.background = on ? "#3ddc84" : "#232323";
+  btn.style.color = on ? "#0a0a0a" : "#ccc";
+}
 
 function renderChart() {
+  updateSmoothToggleBtn();
   const canvas = document.getElementById("mainChart");
   const ctx = canvas.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
@@ -788,11 +806,23 @@ function renderChart() {
     ctx.beginPath();
     ctx.strokeStyle = "#3ddc84";
     ctx.lineWidth = 2;
-    points.forEach((p, i) => {
-      const x = xForDate(p.datum);
-      const y = chartH - ((p.val - min) / (max - min)) * (chartH - 20);
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
+    const smoothOn = localStorage.getItem(CHART_SMOOTH_KEY) === "1";
+    const coords = points.map(p => ({ x: xForDate(p.datum), y: chartH - ((p.val - min) / (max - min)) * (chartH - 20) }));
+
+    if (!smoothOn || coords.length < 3) {
+      coords.forEach((c, i) => { if (i === 0) ctx.moveTo(c.x, c.y); else ctx.lineTo(c.x, c.y); });
+    } else {
+      // Starke, weiche Glättung über Zwischenpunkte (Midpoint-Bezier).
+      // Die eigentlichen Datenpunkte/Werte bleiben unverändert, nur die gezeichnete Linie wird geglättet.
+      ctx.moveTo(coords[0].x, coords[0].y);
+      for (let i = 1; i < coords.length - 1; i++) {
+        const midX = (coords[i].x + coords[i + 1].x) / 2;
+        const midY = (coords[i].y + coords[i + 1].y) / 2;
+        ctx.quadraticCurveTo(coords[i].x, coords[i].y, midX, midY);
+      }
+      const last = coords.length - 1;
+      ctx.quadraticCurveTo(coords[last - 1].x, coords[last - 1].y, coords[last].x, coords[last].y);
+    }
     ctx.stroke();
     ctx.lineWidth = 1;
 
