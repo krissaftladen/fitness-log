@@ -511,7 +511,7 @@ function commitEditStep(rawVal) {
     const maxR = Math.max(...editState.tempReps.map(Number).filter(n => !isNaN(n)));
     const prevBestW = list[idx].bestWeight;
     const prevBestR = list[idx].bestReps;
-    const isNewPR = (prevBestW != null && maxW > prevBestW) || (prevBestR != null && maxR > prevBestR);
+    const isNewPR = (prevBestW != null && maxW > prevBestW);
 
     list[idx].sets = editState.sets;
     list[idx].reps = editState.tempReps;
@@ -710,20 +710,27 @@ function renderTrainingTable() {
       weightCell = `<span class="ex-cell empty" onclick="beginEdit('${ex.id}','weight')">-</span>`;
     }
 
-    // ---- Wdh-Zelle: grün unterstreichen, wenn irgendein Satz >= 12 Wdh (progressive overload) ----
+    // ---- Progressive-Overload-Markierung: alle Sätze >= 12 Wdh -> Gewicht sollte erhöht werden ----
     let repsHasHighRep = false;
+    let allSetsHighRep = false;
     if (!isEditingRow && ex.reps && ex.reps.length) {
       repsHasHighRep = ex.reps.some(r => parseInt(r, 10) >= 12);
+      allSetsHighRep = ex.reps.every(r => parseInt(r, 10) >= 12);
     }
+    const overloadStyle = ' style="color:#3ddc84;"';
+
+    let repsStyle = '';
+    if (allSetsHighRep) repsStyle = ' style="text-decoration: underline; text-decoration-color: #3ddc84; text-decoration-thickness: 2px; color:#3ddc84;"';
+    else if (repsHasHighRep) repsStyle = ' style="text-decoration: underline; text-decoration-color: #3ddc84; text-decoration-thickness: 2px;"';
 
     const isDragging = dragId === ex.id;
 
     return `<tr data-id="${ex.id}" class="${isDragging ? 'dragging' : ''}">
       <td class="ex-handle-cell"><span class="ex-drag-handle" onpointerdown="onDragHandleDown(event,'${ex.id}')">${ex.isPR ? '🏆' : '⠿'}</span></td>
-      <td class="ex-name-cell">${ex.name}</td>
+      <td class="ex-name-cell"${allSetsHighRep ? overloadStyle : ''}>${ex.name}</td>
       <td>${setsCell}</td>
-      <td${repsHasHighRep ? ' style="text-decoration: underline; text-decoration-color: #3ddc84; text-decoration-thickness: 2px;"' : ''}>${repsCell}</td>
-      <td>${weightCell}</td>
+      <td${repsStyle}>${repsCell}</td>
+      <td${allSetsHighRep ? overloadStyle : ''}>${weightCell}</td>
       <td><button class="ex-del-btn" onclick="deleteExercise('${ex.id}')">✕</button></td>
     </tr>`;
   }).join("");
